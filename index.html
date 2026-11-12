@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Autologboek">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#18212a" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Autologboek</title>
+<style>
+@font-face{font-family:"Barlow Condensed";font-weight:500;font-display:swap;src:url(barlow-condensed-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Barlow Condensed";font-weight:600;font-display:swap;src:url(barlow-condensed-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Barlow Condensed";font-weight:700;font-display:swap;src:url(barlow-condensed-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Barlow";font-weight:400;font-display:swap;src:url(barlow-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Barlow";font-weight:500;font-display:swap;src:url(barlow-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Barlow";font-weight:600;font-display:swap;src:url(barlow-latin-600-normal.woff2) format("woff2")}
+/* Plan: instrumentenpaneel-gevoel. Koel grijs vlak, inktblauw, één staalblauwe accent; statuskleuren apart.
+   Layout: kop met voertuigkeuze (kentekenplaten), tabbalk, één kolom kaarten; op breed scherm twee kolommen. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --sunk:#e4e8ed; --ink:#15202b; --ink-2:#4a5866; --muted:#7a8794;
+  --line:#d3d9e0; --accent:#1d5d8f; --accent-ink:#ffffff; --accent-soft:#dbe8f3;
+  --good:#1e7a4c; --good-soft:#dcefe4; --warn:#9a6400; --warn-soft:#fbecc8; --bad:#b4282e; --bad-soft:#f8dcdc;
+  --plate:#f5c400; --plate-ink:#111; --eu:#003399;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --surface:#18212a; --sunk:#111920; --ink:#e7edf2; --ink-2:#a9b6c2; --muted:#7f8d99;
+  --line:#2a3642; --accent:#6aa9dc; --accent-ink:#0b1620; --accent-soft:#1d3245;
+  --good:#5cc48d; --good-soft:#163227; --warn:#e7b04a; --warn-soft:#3a2d12; --bad:#f07a7e; --bad-soft:#3d1c1e;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --surface:#18212a; --sunk:#111920; --ink:#e7edf2; --ink-2:#a9b6c2; --muted:#7f8d99;
+  --line:#2a3642; --accent:#6aa9dc; --accent-ink:#0b1620; --accent-soft:#1d3245;
+  --good:#5cc48d; --good-soft:#163227; --warn:#e7b04a; --warn-soft:#3a2d12; --bad:#f07a7e; --bad-soft:#3d1c1e;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.01em}
+h2{font-size:1.25rem}
+h3{font-size:1.05rem}
+.num{font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;padding-top:env(safe-area-inset-top,0px)}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 8px}
+.brand{font-family:var(--display);font-weight:700;font-size:1.35rem;letter-spacing:.02em}
+.pill{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--sunk);color:var(--ink-2);white-space:nowrap}
+.pill.ok{background:var(--good-soft);color:var(--good)}
+.pill.err{background:var(--bad-soft);color:var(--bad)}
+.vehicles{display:flex;gap:8px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:none}
+.vehicles::-webkit-scrollbar{display:none}
+.vbtn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px;cursor:pointer;min-width:150px;text-align:left}
+.vbtn[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.vbtn .vname{font-size:13px;color:var(--ink-2);font-weight:500}
+.plate{display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;background:var(--plate);color:var(--plate-ink);font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.06em;border:1px solid #0003;line-height:1}
+.plate .eu{background:var(--eu);color:#fff;font-size:8px;padding:3px 3px 2px;display:flex;align-items:flex-end;letter-spacing:0}
+.plate .txt{padding:4px 7px 3px}
+.plate.big{font-size:22px}.plate.big .eu{font-size:10px;padding:4px}.plate.big .txt{padding:6px 10px 5px}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{border:0;background:none;padding:10px 12px;border-bottom:3px solid transparent;color:var(--ink-2);font-weight:500;cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+main{padding-top:16px;padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+.grid{display:grid;gap:14px}
+@media (min-width:860px){.grid.two{grid-template-columns:1.15fr 1fr;align-items:start}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
+.card-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sub{color:var(--muted);font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.tile{background:var(--sunk);border-radius:10px;padding:12px;display:grid;gap:2px;min-width:0}
+.tile .lab{font-size:12px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em}
+.tile .val{font-family:var(--display);font-size:1.6rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
+.tile .note{font-size:12px;color:var(--muted)}
+
+.odo{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+.odo-digits{display:inline-flex;gap:3px;font-family:var(--mono);font-weight:600;font-size:28px}
+.odo-digits span{background:var(--ink);color:var(--surface);border-radius:4px;padding:2px 5px;min-width:1.05em;text-align:center}
+.odo-digits .unit{background:none;color:var(--ink-2);font-size:16px;align-self:flex-end;padding:0 0 4px 4px;font-family:var(--body)}
+
+.banner{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-radius:10px;padding:12px 14px;background:var(--warn-soft);color:var(--ink);border-left:4px solid var(--warn)}
+.banner.info{background:var(--accent-soft);border-left-color:var(--accent)}
+.banner strong{display:block}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:500}
+.btn:hover{background:var(--sunk)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn.ghost{border-color:transparent;background:none;color:var(--ink-2)}
+.btn.danger.armed{background:var(--bad);border-color:var(--bad);color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+form.f{display:grid;gap:10px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+label.fl{display:grid;gap:4px;font-size:13px;color:var(--ink-2);font-weight:500}
+input[type=text],input[type=date],select,textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 10px;font-size:16px}
+textarea{min-height:120px;resize:vertical;font-size:14px;line-height:1.5}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.taskpick{display:grid;gap:4px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg)}
+.taskpick .grp{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:6px}
+.hint{font-size:13px;color:var(--muted)}
+
+.list{display:grid}
+.item{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:10px 0;border-top:1px solid var(--line);align-items:center}
+.item:first-child{border-top:0}
+.item .t{font-weight:500;min-width:0;overflow-wrap:anywhere}
+.item .m{font-size:13px;color:var(--muted);grid-column:1}
+.item .r{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.item .acts{grid-column:2;display:flex;gap:6px;justify-content:flex-end}
+@media (max-width:560px){.item .acts{grid-column:1 / -1;justify-content:flex-start;flex-wrap:wrap}}
+
+.due{display:grid;grid-template-columns:auto 1fr auto;gap:2px 12px;padding:10px 0;border-top:1px solid var(--line);align-items:center}
+.due:first-child{border-top:0}
+.chip{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:99px;white-space:nowrap;display:inline-flex;gap:4px;align-items:center}
+.chip.over{background:var(--bad-soft);color:var(--bad)}
+.chip.binnenkort{background:var(--warn-soft);color:var(--warn)}
+.chip.ok{background:var(--good-soft);color:var(--good)}
+.chip.onbekend{background:var(--sunk);color:var(--ink-2)}
+.chip.prijs-goedkoop{background:var(--accent-soft);color:var(--accent)}
+.imp{font-family:var(--mono);font-size:13px;min-height:160px}
+pre.instr{white-space:pre-wrap;font-family:var(--mono);font-size:12px;background:var(--sunk);border-radius:8px;padding:10px;max-height:260px;overflow:auto;margin:0}
+.due .t{font-weight:500}
+.due .m{font-size:13px;color:var(--muted);grid-column:2}
+.due .acts{grid-row:1 / span 2;grid-column:3}
+
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+dl.specs{display:grid;grid-template-columns:minmax(120px,1fr) 1.3fr;gap:0;margin:0;font-size:14px}
+dl.specs dt,dl.specs dd{margin:0;padding:6px 0;border-bottom:1px solid var(--line)}
+dl.specs dt{color:var(--ink-2)}
+dl.specs dd{font-variant-numeric:tabular-nums}
+details summary{cursor:pointer;color:var(--accent);font-weight:500}
+
+.bars{display:grid;gap:10px}
+.bar{display:grid;gap:4px}
+.bar .bl{display:flex;justify-content:space-between;font-size:14px}
+.bar .track{height:8px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.bar .fill{height:100%;background:var(--accent);border-radius:0 4px 4px 0}
+
+.chart{position:relative}
+.chart svg{display:block;width:100%;height:auto}
+.chart .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12px;padding:6px 8px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
+.todo{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.todo:first-child{border-top:0}
+.todo .t{flex:1;overflow-wrap:anywhere}
+.todo.done .t{text-decoration:line-through;color:var(--muted)}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;max-width:calc(100% - 32px);box-shadow:0 6px 24px #0003;display:none}
+.steps{display:grid;gap:8px;margin:0;padding-left:20px}
+@media (prefers-reduced-motion:no-preference){.toast{transition:opacity .2s}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">Autologboek</div>
+      <span id="savepill" class="pill">Laden…</span>
+    </div>
+    <div class="vehicles" id="vehicles" role="group" aria-label="Kies voertuig"></div>
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+  </div>
+</header>
+<main class="wrap" id="main"></main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+// ---------- Onderhoudsschema ----------
+const TIERS = {1:{km:5000,mnd:1},2:{km:15000,mnd:6},3:{km:30000,mnd:12},4:{km:100000,mnd:60}};
+const SCHEMA_AUTO = [
+  ["olie","Motorolie & oliefilter",[[1,"Controleren & eventueel bijvullen"],[2,"Verversen"]]],
+  ["koel","Koelvloeistof",[[1,"Controleren & bijvullen"],[3,"Verversen"]]],
+  ["sproei","Ruitensproeiervloeistof",[[1,"Bijvullen"]]],
+  ["banden","Banden (spanning & profiel)",[[1,"Controleren"],[3,"Uitlijnen & balanceren"]]],
+  ["remmen","Remmen (vloeistof, blokken, schijven)",[[1,"Visuele controle"],[2,"Vloeistof controleren/verversen"],[3,"Blokken/schijven vervangen indien nodig"]]],
+  ["lucht","Luchtfilter",[[2,"Controleren & indien nodig vervangen"]]],
+  ["brandstof","Brandstoffilter",[[4,"Vervangen"]]],
+  ["bougies","Bougies",[[4,"Controleren & vervangen indien nodig"]]],
+  ["distributie","Distributieriem/-ketting",[[4,"Vervangen volgens fabrieksspecificatie"]]],
+  ["accu","Accu & dynamo",[[1,"Controleren"],[3,"Testen"],[4,"Vervangen indien nodig"]]],
+  ["bak","Versnellingsbakolie",[[4,"Controleren/verversen"]]],
+  ["uitlaat","Uitlaatsysteem",[[3,"Controleren op lekkages"]]],
+  ["airco","Airco-onderhoud",[[3,"Airco bijvullen & reinigen"]]],
+  ["ophanging","Ophanging & stuurinrichting",[[1,"Visuele inspectie"],[3,"Uitgebreide controle"]]]
+];
+const SCHEMAS = {auto:[], motor:[
+  {id:"m-bmw",part:"Fabrieksbeurt",actie:"Jaarlijkse service volgens fabrikant",km:10000,mnd:12},
+  {id:"m-olie",part:"Motorolie & oliefilter",actie:"Verversen",km:5000,mnd:6},
+  {id:"m-lucht",part:"Luchtfilter",actie:"Controleren, reinigen of vervangen",km:10000,mnd:12},
+  {id:"m-banden",part:"Banden",actie:"Spanning en slijtage controleren",km:5000,mnd:null},
+  {id:"m-ketting",part:"Ketting en tandwielen",actie:"Reinigen, smeren en spanning controleren",km:1000,mnd:null},
+  {id:"m-remblok",part:"Remblokken",actie:"Controleren, vervangen bij slijtage",km:10000,mnd:null},
+  {id:"m-remvl",part:"Remvloeistof",actie:"Vervangen",km:null,mnd:24},
+  {id:"m-koel",part:"Koelvloeistof",actie:"Controleren of vervangen",km:null,mnd:24},
+  {id:"m-bougies",part:"Bougies",actie:"Controleren of vervangen",km:10000,mnd:null},
+  {id:"m-ophanging",part:"Voorvork en achterdemper",actie:"Controleren op lekkage en schade",km:10000,mnd:null},
+  {id:"m-licht",part:"Verlichting & elektronica",actie:"Controleren",km:null,mnd:6},
+  {id:"m-accu",part:"Accu",actie:"Laadspanning controleren, polen reinigen",km:null,mnd:6}
+]};
+SCHEMA_AUTO.forEach(([pid,part,acts])=>acts.forEach(([tier,actie])=>SCHEMAS.auto.push({id:pid+"-"+tier,part,actie,km:TIERS[tier].km,mnd:TIERS[tier].mnd})));
+const TASK = Object.fromEntries(SCHEMAS.auto.concat(SCHEMAS.motor).map(t=>[t.id,t]));
+const soortOf=v=>v&&v.soort==="motor"?"motor":"auto";
+const tasksFor=v=>SCHEMAS[soortOf(v)];
+function intervalLabel(t){const p=[];if(t.km)p.push("elke "+nl0.format(t.km)+" km");
+  if(t.mnd)p.push(t.mnd===1?"elke maand":t.mnd===12?"elk jaar":t.mnd%12===0?"elke "+(t.mnd/12)+" jaar":"elke "+t.mnd+" maanden");return p.join(" of ")}
+
+// ---------- Richtprijzen (incl. btw, Nederland 2025-2026; indicatie) ----------
+const PRIJZEN = {
+ auto:[
+  {id:"apk",naam:"APK-keuring",min:30,max:75,re:/\bapk\b/i},
+  {id:"klein",naam:"Kleine beurt",min:100,max:250,re:/kleine\s*(onderhouds)?beurt/i,beurt:true},
+  {id:"groot",naam:"Grote beurt",min:300,max:600,re:/grote\s*(onderhouds)?beurt/i,beurt:true,vervangt:["klein"]},
+  {id:"olie",naam:"Olie en oliefilter verversen (los)",min:80,max:180,re:/olie\s*(verversen|wissel)|olieverversing|oliewissel/i,binnenBeurt:true,taken:["olie-2"]},
+  {id:"remblok",naam:"Remblokken vervangen, per as",min:100,max:250,re:/remblok/i,perAs:true},
+  {id:"remschijf",naam:"Remschijven + remblokken, per as",min:300,max:600,re:/remschij/i,perAs:true,vervangt:["remblok"],taken:["remmen-3"]},
+  {id:"remvl",naam:"Remvloeistof vervangen",min:60,max:130,re:/rem\s*vloeistof/i,binnenBeurt:true,taken:["remmen-2"]},
+  {id:"bougies",naam:"Bougies vervangen",min:80,max:250,re:/bougie/i,binnenBeurt:true,taken:["bougies-4"]},
+  {id:"distributie",naam:"Distributieriem vervangen",min:400,max:1000,re:/distributie/i,taken:["distributie-4"]},
+  {id:"banden",naam:"Autoband incl. montage, per stuk",min:90,max:175,re:/\bband(en)?\b|voorband|achterband/i,perStuk:true},
+  {id:"uitlijnen",naam:"Uitlijnen",min:45,max:90,re:/uitlijn/i,taken:["banden-3"]},
+  {id:"airco",naam:"Airco-service (bijvullen)",min:75,max:150,re:/airco/i,taken:["airco-3"]},
+  {id:"accu",naam:"Accu vervangen",min:120,max:300,re:/accu\s*vervang|nieuwe\s*accu/i,taken:["accu-4"]},
+  {id:"schokdemper",naam:"Schokdempers, per as",min:350,max:850,re:/schokdemper/i,perAs:true},
+  {id:"uitlaat",naam:"Uitlaat (deel) vervangen",min:150,max:800,re:/uitlaat/i}
+ ],
+ motor:[
+  {id:"m-klein",naam:"Kleine of jaarlijkse beurt (10.000 km)",min:130,max:300,re:/kleine\s*(onderhouds)?beurt|jaarlijkse\s*(beurt|service)|10[.\s]?000\s*km[-\s]*(beurt|service)|afleverings?beurt/i,beurt:true,taken:["m-bmw"]},
+  {id:"m-groot",naam:"Grote beurt (20.000 km, klepspeling)",min:400,max:800,re:/grote\s*(onderhouds)?beurt|20[.\s]?000\s*km[-\s]*(beurt|service)|klepspeling/i,beurt:true,vervangt:["m-klein"]},
+  {id:"m-ketting",naam:"Kettingset vervangen incl. montage",min:180,max:400,re:/ketting\s*(set|kit)|kettingset|kettingkit|nieuwe\s*ketting/i},
+  {id:"m-banden",naam:"Motorband incl. montage, per stuk",min:120,max:300,re:/\bband(en)?\b|voorband|achterband/i,perStuk:true},
+  {id:"m-remblok",naam:"Remblokken vervangen, per as",min:100,max:200,re:/remblok/i,perAs:true,taken:["m-remblok"]},
+  {id:"m-remvl",naam:"Remvloeistof vervangen",min:50,max:120,re:/rem\s*vloeistof/i,binnenBeurt:true,taken:["m-remvl"]},
+  {id:"m-olie",naam:"Olie en oliefilter verversen (los)",min:80,max:160,re:/olie\s*(verversen|wissel)|olieverversing|oliewissel/i,binnenBeurt:true,taken:["m-olie"]},
+  {id:"m-bougies",naam:"Bougies vervangen",min:60,max:150,re:/bougie/i,binnenBeurt:true,taken:["m-bougies"]}
+ ]};
+const UURTARIEF={min:61,gem:82,max:165};
+const PRIJSBRON="Richtprijzen inclusief btw voor Nederland (2025–2026), samengesteld uit ANWB, Werkspot, Univé, AutoScout24, KwikFit en Quispel Motoren (BMW F-serie). Het is een indicatie: merk, type en garage maken veel uit, en een merkdealer is vaak duurder.";
+function qtyBanden(t){const m=t.match(/(\d)\s*[x×]?\s*(?:nieuwe\s+)?(?:[a-z]+[\s-]+){0,2}?band(?:en)?\b/i);if(m&&+m[1]>0)return +m[1];
+  if(/voor.{0,10}(en|\+|&).{0,10}achter/i.test(t)&&/band/i.test(t))return 2;
+  const n=(t.match(/(voor|achter)band/gi)||[]).length;return n}
+function matchPrijzen(v,u){
+  const omschr=String(u.omschr||"").replace(/\([^)]*\)/g," "), all=omschr+"\n"+(u.regels||[]).map(r=>r.omschr).join("\n");
+  let hits=PRIJZEN[soortOf(v)].filter(p=>p.re.test(all));
+  if(hits.some(h=>h.beurt))hits=hits.filter(h=>!h.binnenBeurt);
+  const drop=new Set(hits.flatMap(h=>h.vervangt||[])); hits=hits.filter(h=>!drop.has(h.id));
+  if(!hits.length)return null;
+  const both=/voor.{0,12}(en|\+|&).{0,12}achter|2\s*sets?\b/i.test(all);
+  const items=hits.map(h=>{let q=1;if(h.perStuk)q=qtyBanden(omschr)||qtyBanden(all)||1;if(h.perAs&&both)q=2;return {id:h.id,naam:h.naam,q,min:h.min*q,max:h.max*q}});
+  return {items,min:items.reduce((a,i)=>a+i.min,0),max:items.reduce((a,i)=>a+i.max,0),all};
+}
+function uurtarief(u){
+  const btwApart=(u.regels||[]).some(r=>/btw/i.test(r.omschr));
+  for(const r of u.regels||[]){ if(!(r.bedrag>0)||!/arbeid|uurloon|loon/i.test(r.omschr))continue;
+    const m=r.omschr.match(/(\d+(?:[.,]\d+)?)\s*(?:uur|u)\b/i); if(!m)continue; const h=parseNum(m[1]); if(!h)continue;
+    return Math.round(r.bedrag/h*(btwApart?1.21:1)*100)/100; }
+  return null;
+}
+const OORDEEL={goedkoop:["Goedkoop","prijs-goedkoop"],normaal:["Normale prijs","ok"],hoog:["Aan de hoge kant","binnenkort"],duur:["Duur","over"]};
+function prijsCheck(v,u){
+  if(!u||!(u.bedrag>0)||!["Onderhoud","Reparatie","APK"].includes(u.cat))return null;
+  const m=matchPrijzen(v,u); if(!m)return null;
+  if(!/arbeid|uurloon|montage|monter|beurt|keuring|\bapk\b|service|vervang|uitgevoerd|uitlijn/i.test(m.all))return null;
+  const b=u.bedrag; const oordeel=b<m.min*0.9?"goedkoop":b>m.max*1.2?"duur":b>m.max?"hoog":"normaal";
+  return {...m,oordeel,uur:uurtarief(u)};
+}
+function prijsChip(pc){if(!pc)return "";const [t,c]=OORDEEL[pc.oordeel];return `<span class="chip ${c}">${t}</span>`}
+function prijsUitleg(pc){return "richtprijs "+eur0(pc.min)+"–"+eur0(pc.max)+" voor "+pc.items.map(i=>(i.q>1?i.q+"× ":"")+i.naam.replace(/, per (stuk|as)/,"").toLowerCase()).join(" + ")}
+function monteurTekst(v,u,pc){return `Ik heb ${eur(u.bedrag)} betaald voor: ${u.omschr} (${fdate(u.datum)}). Volgens richtprijzen in Nederland kost dit meestal ${eur0(pc.min)} tot ${eur0(pc.max)} (${pc.items.map(i=>(i.q>1?i.q+"× ":"")+i.naam).join(" + ")}).${pc.uur?` Het uurtarief op de factuur is ongeveer ${eur(pc.uur)}, gemiddeld is dat ${eur0(UURTARIEF.gem)}.`:""} Kunt u uitleggen waar het verschil in zit?`}
+function taakPrijs(v,id){const p=PRIJZEN[soortOf(v)].find(x=>(x.taken||[]).includes(id));return p?"ca. "+eur0(p.min)+"–"+eur0(p.max):""}
+const CATS = ["Onderhoud","Reparatie","Onderdelen","APK","Aankoop","Overig"];
+
+// ---------- Startgegevens ----------
+function uid(){return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4)}
+function emptyVehicle(id,naam){
+  return {id,naam,soort:"auto",kenteken:"",merkModel:"",brandstof:"",bouwjaar:"",apk:"",eigendomSinds:"",startKm:null,nedc:null,
+    schemaStart:null,specs:[],lasten:[],fuel:[],uitgaven:[],klusjes:[]};
+}
+function makeDefault(){
+  return {v:1,active:"v1",updated:"",lastBackup:null,vehicles:[emptyVehicle("v1","Auto 1"),emptyVehicle("v2","Auto 2"),emptyVehicle("v3","Auto 3")]};
+}
+
+// ---------- Hulpfuncties ----------
+const nlEur = new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR"});
+const nlEur0 = new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR",maximumFractionDigits:0});
+const nl0 = new Intl.NumberFormat("nl-NL",{maximumFractionDigits:0});
+const nl1 = new Intl.NumberFormat("nl-NL",{minimumFractionDigits:1,maximumFractionDigits:1});
+const nl2 = new Intl.NumberFormat("nl-NL",{minimumFractionDigits:2,maximumFractionDigits:2});
+const eur = n=>nlEur.format(n||0), eur0=n=>nlEur0.format(n||0);
+const km = n=>n==null?"—":nl0.format(n)+" km";
+const MAANDEN=["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
+function fdate(iso){if(!iso)return"—";const[y,m,d]=iso.split("-").map(Number);return d+" "+MAANDEN[m-1]+" "+y}
+function todayIso(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function toDate(iso){const[y,m,d]=iso.split("-").map(Number);return new Date(y,m-1,d)}
+function days(a,b){return Math.round((toDate(b)-toDate(a))/86400000)}
+function addMonths(iso,n){const d=toDate(iso);const day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+n);const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function fullMonths(a,b){const A=toDate(a),B=toDate(b);let m=(B.getFullYear()-A.getFullYear())*12+(B.getMonth()-A.getMonth());if(B.getDate()<A.getDate())m--;return Math.max(0,m)}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function parseNum(s){s=String(s??"").trim().replace(/[€\s]/g,"");if(!s)return null;if(s.includes(","))s=s.replace(/\./g,"").replace(",",".");const n=Number(s);return isFinite(n)?n:null}
+function parseKm(s){s=String(s??"").replace(/[^\d]/g,"");return s?Number(s):null}
+function rel(n){if(n===0)return"vandaag";if(n===1)return"gisteren";return n+" dagen geleden"}
+
+// ---------- Berekeningen ----------
+function V(){return state.vehicles.find(v=>v.id===state.active)||state.vehicles[0]}
+function currentKm(v){let m=v.startKm;for(const e of v.fuel)if(e.km!=null&&(m==null||e.km>m))m=e.km;for(const u of v.uitgaven)if(u.km!=null&&(m==null||u.km>m))m=u.km;if(v.schemaStart&&v.schemaStart.km!=null&&(m==null||v.schemaStart.km>m))m=v.schemaStart.km;return m}
+function lastKmEntry(v){return [...v.fuel].sort((a,b)=>a.datum<b.datum?1:a.datum>b.datum?-1:b.km-a.km)[0]||null}
+function segments(v){
+  const f=v.fuel.filter(e=>e.bedrag||e.liters).sort((a,b)=>a.km-b.km||(a.datum<b.datum?-1:1));
+  const out=[];let prev=null,L=0,E=0,okL=true;
+  for(const e of f){
+    if(prev){L+=e.liters||0;E+=e.bedrag||0;if(!e.liters)okL=false;
+      if(e.vol){const d=e.km-prev.km;if(d>0)out.push({id:e.id,datum:e.datum,km:d,liters:okL?L:null,euro:E});prev=e;L=0;E=0;okL=true}}
+    else if(e.vol)prev=e;
+  }
+  return out;
+}
+function avgUse(v){const s=segments(v).filter(x=>x.liters);const K=s.reduce((a,x)=>a+x.km,0),L=s.reduce((a,x)=>a+x.liters,0);
+  const s2=segments(v);const K2=s2.reduce((a,x)=>a+x.km,0),E2=s2.reduce((a,x)=>a+x.euro,0);
+  return {l100:K?L/K*100:null,op:L?K/L:null,e100:K2?E2/K2*100:null,n:s.length}}
+function taskStatus(v){
+  const cur=currentKm(v),t=todayIso();
+  return tasksFor(v).map(task=>{
+    const done=v.uitgaven.filter(u=>(u.taken||[]).includes(task.id)).sort((a,b)=>a.datum<b.datum?1:-1)[0];
+    let base=null;
+    if(done)base={km:done.km!=null?done.km:(v.schemaStart?.km??null),datum:done.datum,bron:"done"};
+    else if(v.schemaStart&&(v.schemaStart.datum||v.schemaStart.km!=null))base={km:v.schemaStart.km,datum:v.schemaStart.datum,bron:"start"};
+    if(!base)return {...task,status:"onbekend",score:9,dueKm:null,dueDate:null};
+    const dueKm=base.km!=null&&task.km?base.km+task.km:null, dueDate=base.datum&&task.mnd?addMonths(base.datum,task.mnd):null;
+    const restKm=dueKm!=null&&cur!=null?dueKm-cur:null, restD=dueDate?days(t,dueDate):null;
+    if(restKm==null&&restD==null)return {...task,status:"onbekend",score:9,dueKm:null,dueDate:null,last:done||null};
+    const soonKm=task.km?Math.max(task.km<=1000?150:500,task.km*.1):0, soonD=task.mnd===1?7:30;
+    let status="ok";
+    if((restKm!=null&&restKm<=0)||(restD!=null&&restD<=0))status="over";
+    else if((restKm!=null&&restKm<=soonKm)||(restD!=null&&restD<=soonD))status="binnenkort";
+    const fr=[];if(restKm!=null)fr.push(restKm/task.km);if(restD!=null)fr.push(restD/(task.mnd*30.4));
+    return {...task,status,restKm,restD,dueKm,dueDate,last:done||null,score:fr.length?Math.min(...fr):5};
+  }).sort((a,b)=>a.score-b.score);
+}
+function apkStatus(v){if(!v.apk)return null;const d=days(todayIso(),v.apk);return {d,status:d<0?"over":d<=60?"binnenkort":"ok"}}
+const MND_KORT={jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,okt:10,nov:11,dec:12};
+function parseMaanden(t){return [...new Set((String(t||"").toLowerCase().match(/[a-z]+/g)||[]).map(w=>MND_KORT[w.slice(0,3)]).filter(Boolean))].sort((a,b)=>a-b)}
+const maandNamen=arr=>(arr||[]).map(m=>MAANDEN[m-1]).join(", ");
+function lastTekst(l){return l.naam+": "+String(l.bedrag).replace(".",",")+((l.niet||[]).length?" (niet in "+maandNamen(l.niet)+")":"")}
+function parseLastRegel(line){const m=line.match(/^(.*?):\s*([^()]+?)\s*(?:\((?:niet|behalve|geschorst)?\s*(?:in)?\s*([^)]*)\))?\s*$/i);if(!m)return null;const n=parseNum(m[2]);if(n==null||!m[1].trim())return null;const niet=parseMaanden(m[3]);return niet.length?{naam:m[1].trim(),bedrag:Math.abs(n),niet}:{naam:m[1].trim(),bedrag:Math.abs(n)}}
+function lastenInMaand(v,mnd){return v.lasten.reduce((a,l)=>a+((l.niet||[]).includes(mnd)?0:(l.bedrag||0)),0)}
+function vasteLasten(v,maanden){let t=0;for(let k=0;k<maanden;k++){const m=toDate(addMonths(v.eigendomSinds,k)).getMonth()+1;t+=lastenInMaand(v,m)}return t}
+function voorAankoop(v,u){return !!(v.eigendomSinds&&u.cat!=="Aankoop"&&u.datum&&u.datum<v.eigendomSinds)}
+function eigenUitgaven(v){return v.uitgaven.filter(u=>!voorAankoop(v,u))}
+function costs(v){
+  const own=eigenUitgaven(v), ownFuel=v.fuel.filter(e=>!v.eigendomSinds||e.datum>=v.eigendomSinds);
+  const sum=c=>own.filter(u=>c(u.cat)).reduce((a,u)=>a+(u.bedrag||0),0);
+  const aankoop=sum(c=>c==="Aankoop"), onderhoud=sum(c=>["Onderhoud","Reparatie","Onderdelen","APK"].includes(c)), overig=sum(c=>c==="Overig");
+  const brandstof=ownFuel.reduce((a,e)=>a+(e.bedrag||0),0);
+  const perMaand=v.lasten.reduce((a,l)=>a+(l.bedrag||0),0);
+  const maanden=v.eigendomSinds?fullMonths(v.eigendomSinds,todayIso()):0;
+  const vast=v.eigendomSinds?vasteLasten(v,maanden):0;
+  const totaal=aankoop+onderhoud+overig+brandstof+vast;
+  const cur=currentKm(v); const kms=ownFuel.map(e=>e.km).concat(own.map(u=>u.km)).filter(x=>x!=null);
+  const first=v.startKm!=null?v.startKm:(kms.length?Math.min(...kms):null);
+  const gereden=cur!=null&&first!=null?cur-first:0;
+  const vorig=v.uitgaven.filter(u=>voorAankoop(v,u)).reduce((a,u)=>a+(u.bedrag||0),0);
+  return {aankoop,onderhoud,overig,brandstof,perMaand,maanden,vast,totaal,exclVast:aankoop+onderhoud+overig+brandstof,gereden,first,vorig};
+}
+function describeDue(s){
+  if(s.status==="onbekend")return "Nog niet vastgelegd wanneer dit voor het laatst is gedaan";
+  const p=[];
+  if(s.restKm!=null)p.push(s.restKm<=0?nl0.format(-s.restKm)+" km over tijd":"over "+nl0.format(s.restKm)+" km (bij "+nl0.format(s.dueKm)+")");
+  if(s.restD!=null)p.push(s.restD<=0?(s.restD===0?"vandaag":(-s.restD)+" dagen over tijd"):"uiterlijk "+fdate(s.dueDate));
+  return p.join(" · ")+(s.last?" — laatst "+fdate(s.last.datum):"");
+}
+
+// ---------- Opslag (alleen op deze telefoon) ----------
+const KEY="autologboek";
+let state=null, tab="overzicht";
+try{state=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){try{localStorage.setItem(KEY+".beschadigd",localStorage.getItem(KEY))}catch(x){}}
+if(!state||!Array.isArray(state.vehicles))state=makeDefault();
+try{tab=localStorage.getItem(KEY+"-tab")||"overzicht"}catch(e){}
+if(location.hash&&["overzicht","tanken","onderhoud","kosten","klusjes","gegevens"].includes(location.hash.slice(1)))tab=location.hash.slice(1);
+function pill(kind,text){const p=document.getElementById("savepill");p.className="pill "+(kind||"");p.textContent=text}
+function backupPill(){const b=state.lastBackup;pill(b&&days(b.slice(0,10),todayIso())<14?"ok":"",b?"Back-up "+fdate(b.slice(0,10)):"Nog geen back-up")}
+function save(){
+  state.updated=new Date().toISOString();
+  try{localStorage.setItem(KEY,JSON.stringify(state));backupPill()}
+  catch(e){pill("err","Niet opgeslagen");toast("Opslaan is niet gelukt. Maak meteen een back-up via Gegevens.")}
+}
+function isTyping(){const a=document.activeElement;return a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)}
+function hasData(){return state.vehicles.some(v=>v.kenteken||v.fuel.length||v.uitgaven.length)}
+function backupDue(){if(!hasData())return false;const b=state.lastBackup;return !b||(days(b.slice(0,10),todayIso())>=14&&state.updated>b)}
+const backupText=()=>JSON.stringify({app:"autologboek",version:1,exported:new Date().toISOString(),state},null,1);
+async function saveFile(name,text,type){
+  const f=new File([text],name,{type});
+  try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f]});return true}}
+  catch(e){if(e&&e.name==="AbortError")return false}
+  const u=URL.createObjectURL(f),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),30000);return true;
+}
+async function exportBackup(){if(await saveFile("autologboek-backup-"+todayIso()+".json",backupText(),"application/json")){state.lastBackup=new Date().toISOString();save();render();toast("Back-up gemaakt. Kies 'Bewaar in Bestanden' en dan iCloud Drive.")}}
+function parseBackup(t){const d=JSON.parse(String(t).trim());const st=d&&d.state?d.state:d;if(!st||!Array.isArray(st.vehicles))throw new Error("geen back-up");
+  st.vehicles.forEach(v=>{["specs","lasten","fuel","uitgaven","klusjes"].forEach(k=>{if(!Array.isArray(v[k]))v[k]=[]})});return st}
+
+// ---------- Weergave ----------
+const TABS=[["overzicht","Overzicht"],["tanken","Tanken & km"],["onderhoud","Onderhoud"],["kosten","Kosten"],["klusjes","Klusjes"],["gegevens","Gegevens"]];
+function plate(k,big){return `<span class="plate${big?" big":""}"><span class="eu">NL</span><span class="txt">${esc(k||"— — —")}</span></span>`}
+function chip(s){const t={over:"Nu doen",binnenkort:"Binnenkort",ok:"In orde",onbekend:"Onbekend"}[s];const i={over:"!",binnenkort:"◷",ok:"✓",onbekend:"?"}[s];return `<span class="chip ${s}"><span aria-hidden="true">${i}</span>${t}</span>`}
+
+function render(){
+  const v=V();
+  document.getElementById("vehicles").innerHTML=state.vehicles.map(x=>
+    `<button class="vbtn" data-act="vehicle" data-id="${x.id}" aria-pressed="${x.id===v.id}">${plate(x.kenteken)}<span class="vname">${esc(x.naam)}</span></button>`).join("");
+  document.getElementById("tabs").innerHTML=TABS.map(([k,l])=>`<button class="tab" role="tab" data-act="tab" data-tab="${k}" aria-selected="${k===tab}">${l}</button>`).join("");
+  const m=document.getElementById("main");
+  m.innerHTML=({overzicht:vOverzicht,tanken:vTanken,onderhoud:vOnderhoud,kosten:vKosten,klusjes:vKlusjes,gegevens:vGegevens})[tab](v);
+  if(tab==="tanken")drawChart(v);
+}
+function reminder(v){
+  const last=lastKmEntry(v);
+  const d=last?days(last.datum,todayIso()):null;
+  if(d!=null&&d<7)return "";
+  return `<div class="banner"><div><strong>Tijd voor je wekelijkse km-stand</strong><span class="sub">${last?"Laatst ingevuld "+rel(d)+" ("+km(last.km)+")":"Je hebt nog geen km-stand ingevuld"}</span></div><button class="btn primary" data-act="goto" data-tab="tanken">Km-stand invullen</button></div>`;
+}
+function odo(n){if(n==null)return `<div class="odo-digits"><span>–</span><span>–</span><span>–</span><span>–</span><span>–</span><span>–</span><span class="unit">km</span></div>`;
+  return `<div class="odo-digits" aria-label="${km(n)}">${String(n).padStart(6,"0").split("").map(c=>`<span>${c}</span>`).join("")}<span class="unit">km</span></div>`}
+
+function vOverzicht(v){
+  const cur=currentKm(v), last=lastKmEntry(v), u=avgUse(v), c=costs(v), apk=apkStatus(v);
+  const st=taskStatus(v), next=st.filter(s=>s.status!=="ok"&&s.status!=="onbekend").slice(0,5);
+  const unknown=st.filter(s=>s.status==="onbekend").length;
+  const isEmpty=!v.kenteken&&!v.merkModel&&!v.fuel.length&&!v.uitgaven.length;
+  if(isEmpty)return `<div class="grid"><div class="card"><h2>${esc(v.naam)}</h2><p>${hasData()?"Dit voertuig heeft nog geen gegevens. Vul kenteken, merk en km-stand in om te beginnen.":"Welkom. Heb je een startbestand of een back-up? Zet die dan eerst terug, dan staat alles er meteen in."}</p><div class="row">${hasData()?"":`<button class="btn primary" data-act="gotobackup">Startbestand of back-up laden</button>`}<button class="btn${hasData()?" primary":""}" data-act="goto" data-tab="gegevens">Gegevens invullen</button></div></div></div>`;
+  const setup=[];
+  if(cur==null)setup.push(`<li>Vul de huidige km-stand in bij <button class="btn small" data-act="goto" data-tab="tanken">Tanken & km</button></li>`);
+  if(!v.schemaStart&&unknown)setup.push(`<li>Geef aan wanneer de laatste onderhoudsbeurt was, dan rekent de app vanaf daar. <button class="btn small" data-act="goto" data-tab="gegevens">Startpunt instellen</button></li>`);
+  if(soortOf(v)==="auto"&&apk&&apk.status==="over")setup.push(`<li>De APK-datum (${fdate(v.apk)}) is verstreken. Klopt die nog? <button class="btn small" data-act="goto" data-tab="gegevens">APK-datum bijwerken</button></li>`);
+  return `<div class="grid">
+  ${backupDue()?`<div class="banner info"><div><strong>Tijd voor een back-up</strong><span class="sub">${state.lastBackup?"Je laatste back-up is van "+fdate(state.lastBackup.slice(0,10))+".":"Je hebt nog geen back-up."} Je gegevens staan alleen op deze telefoon.</span></div><button class="btn primary" data-act="backup">Back-up maken</button></div>`:""}
+  ${reminder(v)}
+  ${setup.length?`<div class="banner info"><div><strong>Nog even instellen</strong><ol class="steps">${setup.join("")}</ol></div></div>`:""}
+  <div class="grid two">
+   <div class="grid">
+    <div class="card"><div class="odo"><div style="display:grid;gap:6px">${plate(v.kenteken,true)}<span class="sub">${esc(v.merkModel||v.naam)}${v.bouwjaar?" · "+esc(v.bouwjaar):""}</span></div>
+      <div style="display:grid;gap:4px;justify-items:end">${odo(cur)}<span class="sub">${last?"Bijgewerkt "+rel(days(last.datum,todayIso())):"Nog geen km-stand"}</span></div></div>
+      <div class="row"><button class="btn primary" data-act="goto" data-tab="tanken">Km-stand of tanken invoeren</button><button class="btn" data-act="goto" data-tab="onderhoud">Onderhoud vastleggen</button></div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><span class="lab">Verbruik</span><span class="val">${u.op?"1 op "+nl1.format(u.op):"—"}</span><span class="note">${u.l100?nl1.format(u.l100)+" l/100 km"+(v.nedc?" · fabriek "+nl1.format(v.nedc):""):"Na twee volle tanks"}</span></div>
+      <div class="tile"><span class="lab">Kosten tot nu</span><span class="val">${eur0(c.totaal)}</span><span class="note">incl. ${eur0(c.vast)} vaste lasten</span></div>
+      ${soortOf(v)==="motor"&&!v.apk?`<div class="tile"><span class="lab">APK</span><span class="val">Geen</span><span class="note">Motoren hebben geen APK-plicht</span></div>`:`<div class="tile"><span class="lab">APK</span><span class="val">${apk?(apk.d<0?"Verlopen":apk.d+" dagen"):"—"}</span><span class="note">${v.apk?fdate(v.apk):"Datum invullen bij Gegevens"}</span></div>`}
+    </div>
+    <div class="card"><div class="card-head"><h2>Komend onderhoud</h2><button class="btn small ghost" data-act="goto" data-tab="onderhoud">Alles bekijken</button></div>
+      ${next.length?`<div class="list">${next.map(dueRow).join("")}</div>`:`<p class="empty">${unknown===tasksFor(v).length?"Stel een startpunt in om te zien welk onderhoud eraan komt.":"Er staat niets op korte termijn. Volgende: "+esc((st.find(s=>s.status==="ok")||{}).part||"—")+"."}</p>`}
+    </div>
+   </div>
+   <div class="card"><h2>Basisgegevens</h2>
+     <dl class="specs">
+       <dt>Kenteken</dt><dd>${esc(v.kenteken||"—")}</dd><dt>Merk en model</dt><dd>${esc(v.merkModel||"—")}</dd>
+       <dt>Brandstof</dt><dd>${esc(v.brandstof||"—")}</dd><dt>Bouwjaar</dt><dd>${esc(v.bouwjaar||"—")}</dd>
+       <dt>APK geldig tot</dt><dd>${fdate(v.apk)}</dd><dt>In bezit sinds</dt><dd>${fdate(v.eigendomSinds)}</dd>
+       ${v.specs.slice(0,6).map(([k,x])=>`<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join("")}
+     </dl>
+     ${v.specs.length>6?`<details><summary>Alle ${v.specs.length} RDW-gegevens</summary><dl class="specs">${v.specs.slice(6).map(([k,x])=>`<dt>${esc(k)}</dt><dd>${esc(x)}</dd>`).join("")}</dl></details>`:""}
+   </div>
+  </div></div>`;
+}
+function dueRow(s){
+  return `<div class="due">${chip(s.status)}<span class="t">${esc(s.part)}: ${esc(s.actie.toLowerCase())}</span><span class="m">${describeDue(s)} · ${intervalLabel(s)}${taakPrijs(V(),s.id)?" · "+taakPrijs(V(),s.id):""}</span>
+   <span class="acts"><button class="btn small" data-act="done" data-task="${s.id}">Gedaan</button></span></div>`;
+}
+
+function vTanken(v){
+  const cur=currentKm(v), u=avgUse(v), seg=segments(v), segMap=Object.fromEntries(seg.map(s=>[s.id,s]));
+  const st=taskStatus(v).filter(s=>s.status!=="onbekend").slice(0,3);
+  const fp={};
+  const list=[...v.fuel].sort((a,b)=>b.km-a.km||(a.datum<b.datum?1:-1));
+  return `<div class="grid">${reminder(v)}<div class="grid two">
+  <div class="grid">
+   <div class="card"><h2>Km-stand en tanken invoeren</h2>
+    <form class="f" data-form="fuel">
+      <div class="fields">
+        <label class="fl" for="f-datum">Datum<input type="date" id="f-datum" name="datum" value="${fp.datum||todayIso()}" required></label>
+        <label class="fl" for="f-km">Km-stand<input type="text" id="f-km" name="km" inputmode="numeric" value="${fp.km?fp.km:""}" placeholder="${cur!=null?nl0.format(cur):"bijv. 185.400"}" required autocomplete="off"></label>
+      </div>
+      <label class="check" for="f-getankt"><input type="checkbox" id="f-getankt" name="getankt" checked data-act="toggle-tank"> Ik heb getankt</label>
+      <div class="fields" id="tankvelden">
+        <label class="fl" for="f-bedrag">Bedrag (€)<input type="text" id="f-bedrag" name="bedrag" inputmode="decimal" value="${fp.bedrag?String(fp.bedrag).replace(".",","):""}" placeholder="bijv. 62,40" autocomplete="off"></label>
+        <label class="fl" for="f-liters">Liters<input type="text" id="f-liters" name="liters" inputmode="decimal" value="${fp.liters?String(fp.liters).replace(".",","):""}" placeholder="bijv. 31,2" autocomplete="off"></label>
+      </div>
+      <label class="check" for="f-vol" id="volrij"><input type="checkbox" id="f-vol" name="vol" checked> Tank helemaal vol</label>
+      <p class="hint">Met liters erbij zie je het echte verbruik (1 op …). Zonder liters rekent de app in euro per 100 km. Tank je niet vol, vink dat uit: die liters tellen dan mee bij de volgende volle tank.</p>
+      <div><button class="btn primary" type="submit">Opslaan</button></div>
+    </form>
+   </div>
+   <div class="card"><h2>Eerstvolgend onderhoud</h2>${st.length?`<div class="list">${st.map(dueRow).join("")}</div>`:`<p class="empty">Stel bij Gegevens een startpunt in, dan zie je hier wat eraan komt.</p>`}</div>
+   ${importCard(v)}
+  </div>
+  <div class="grid">
+   <div class="card"><div class="card-head"><h2>Verbruik</h2><span class="sub">${u.n} meting${u.n===1?"":"en"}</span></div>
+     <div class="tiles">
+      <div class="tile"><span class="lab">Gemiddeld</span><span class="val">${u.op?"1 op "+nl1.format(u.op):"—"}</span><span class="note">${u.l100?nl1.format(u.l100)+" l/100 km":"liters nodig"}</span></div>
+      <div class="tile"><span class="lab">Brandstofkosten</span><span class="val">${u.e100?eur(u.e100):"—"}</span><span class="note">per 100 km</span></div>
+     </div>
+     <div class="chart" id="chart"></div>
+   </div>
+   <div class="card"><h2>Geschiedenis</h2>
+    ${list.length?`<div class="list">${list.map(e=>{const s=segMap[e.id];
+      const info=e.bedrag||e.liters?[e.bedrag?eur(e.bedrag):null,e.liters?nl2.format(e.liters)+" l":null,e.bedrag&&e.liters?eur(e.bedrag/e.liters)+"/l":null,e.vol?null:"niet vol"].filter(Boolean).join(" · "):"Alleen km-stand";
+      const use=s?(s.liters?"1 op "+nl1.format(s.km/s.liters):eur(s.euro/s.km*100)+"/100 km")+" over "+nl0.format(s.km)+" km":"";
+      return `<div class="item"><span class="t num">${km(e.km)}</span><span class="r">${use?esc(use):""}</span><span class="m">${fdate(e.datum)} · ${info}</span><span class="acts"><button class="btn small ghost danger" data-act="del" data-kind="fuel" data-id="${e.id}">Verwijderen</button></span></div>`}).join("")}</div>`:`<p class="empty">Nog niets ingevoerd.</p>`}
+   </div>
+  </div></div></div>`;
+}
+
+function drawChart(v){
+  const el=document.getElementById("chart"); if(!el)return;
+  const s=segments(v).filter(x=>x.liters).map(x=>({...x,y:x.liters/x.km*100}));
+  if(s.length<2){el.innerHTML=`<p class="empty">Na drie volle tanks met liters zie je hier hoe het verbruik verloopt.</p>`;return}
+  const W=640,H=210,L=40,R=16,T=14,B=28;
+  const ys=s.map(p=>p.y).concat(v.nedc?[v.nedc]:[]);
+  let lo=Math.floor(Math.min(...ys)-.5),hi=Math.ceil(Math.max(...ys)+.5); if(lo<0)lo=0;
+  const X=i=>L+(s.length===1?0:i*(W-L-R)/(s.length-1)), Y=y=>T+(hi-y)*(H-T-B)/(hi-lo);
+  const ticks=[lo,(lo+hi)/2,hi];
+  const css=getComputedStyle(document.documentElement), c=n=>css.getPropertyValue(n).trim();
+  const path=s.map((p,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(p.y).toFixed(1)).join(" ");
+  const area=path+` L${X(s.length-1).toFixed(1)} ${H-B} L${X(0).toFixed(1)} ${H-B} Z`;
+  const lastI=s.length-1;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verbruik in liter per 100 km per tankbeurt">
+   ${ticks.map(t=>`<line x1="${L}" x2="${W-R}" y1="${Y(t)}" y2="${Y(t)}" stroke="${c("--line")}" stroke-width="1"/><text x="${L-6}" y="${Y(t)+4}" text-anchor="end" font-size="11" fill="${c("--muted")}">${nl1.format(t)}</text>`).join("")}
+   ${v.nedc?`<line x1="${L}" x2="${W-R}" y1="${Y(v.nedc)}" y2="${Y(v.nedc)}" stroke="${c("--ink-2")}" stroke-dasharray="4 4" stroke-width="1"/><text x="${W-R}" y="${Y(v.nedc)-5}" text-anchor="end" font-size="11" fill="${c("--ink-2")}">fabriek ${nl1.format(v.nedc)}</text>`:""}
+   <path d="${area}" fill="${c("--accent")}" opacity=".12"/>
+   <path d="${path}" fill="none" stroke="${c("--accent")}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+   <circle cx="${X(lastI)}" cy="${Y(s[lastI].y)}" r="4.5" fill="${c("--accent")}" stroke="${c("--surface")}" stroke-width="2"/>
+   <text x="${L}" y="${H-8}" font-size="11" fill="${c("--muted")}">${fdate(s[0].datum)}</text>
+   <text x="${W-R}" y="${H-8}" font-size="11" text-anchor="end" fill="${c("--muted")}">${fdate(s[lastI].datum)}</text>
+   <circle id="hov" r="4.5" fill="${c("--accent")}" stroke="${c("--surface")}" stroke-width="2" style="display:none"/>
+   ${s.map((p,i)=>{const w=(W-L-R)/Math.max(1,s.length-1);return `<rect data-i="${i}" x="${X(i)-w/2}" y="${T}" width="${w}" height="${H-T-B}" fill="transparent"/>`}).join("")}
+  </svg><div class="tip" id="tip"></div><p class="sub">Liter per 100 km per volle tank; lager is zuiniger.</p>`;
+  const svg=el.querySelector("svg"),tip=el.querySelector("#tip"),hov=el.querySelector("#hov");
+  const show=i=>{const p=s[i];const r=svg.getBoundingClientRect(),k=r.width/W;hov.setAttribute("cx",X(i));hov.setAttribute("cy",Y(p.y));hov.style.display="";
+    tip.style.display="block";tip.style.left=X(i)*k+"px";tip.style.top=Y(p.y)*k+"px";tip.textContent=fdate(p.datum)+": "+nl1.format(p.y)+" l/100 km (1 op "+nl1.format(100/p.y)+")"};
+  svg.querySelectorAll("rect[data-i]").forEach(rc=>{rc.addEventListener("pointerenter",()=>show(+rc.dataset.i));rc.addEventListener("pointerdown",()=>show(+rc.dataset.i))});
+  svg.addEventListener("pointerleave",()=>{tip.style.display="none";hov.style.display="none"});
+}
+
+let prefill=null;
+function uitgaveForm(v,p){
+  p=p||{};const sel=new Set(p.taken||[]);const cur=currentKm(v);
+  const lbls=[...new Set(tasksFor(v).map(intervalLabel))];
+  const groups=lbls.map(L=>`<div class="grp">${esc(L)}</div>`+tasksFor(v).filter(x=>intervalLabel(x)===L).map(x=>`<label class="check" for="tk-${x.id}"><input type="checkbox" id="tk-${x.id}" name="taak" value="${x.id}"${sel.has(x.id)?" checked":""}> ${esc(x.part)}: ${esc(x.actie.toLowerCase())}</label>`).join("")).join("");
+  return `<form class="f" data-form="uitgave" id="uitgaveform">
+    <div class="fields">
+      <label class="fl" for="u-datum">Datum<input type="date" id="u-datum" name="datum" value="${p.datum||todayIso()}" required></label>
+      <label class="fl" for="u-km">Km-stand<input type="text" id="u-km" name="km" inputmode="numeric" value="${p.km!=null?p.km:(cur!=null?cur:"")}" autocomplete="off"></label>
+      <label class="fl" for="u-cat">Soort<select id="u-cat" name="cat">${CATS.map(c=>`<option${c===(p.cat||"Onderhoud")?" selected":""}>${c}</option>`).join("")}</select></label>
+      <label class="fl" for="u-bedrag">Kosten (€)<input type="text" id="u-bedrag" name="bedrag" inputmode="decimal" value="${p.bedrag!=null?String(p.bedrag).replace(".",","):""}" placeholder="0,00" autocomplete="off"></label>
+    </div>
+    <label class="fl" for="u-omschr">Wat is er gedaan<input type="text" id="u-omschr" name="omschr" value="${esc(p.omschr||"")}" placeholder="bijv. Kleine beurt bij garage" required></label>
+    <div id="prijshint" class="hint" aria-live="polite">${prijsHint(v,{cat:p.cat||"Onderhoud",omschr:p.omschr,bedrag:p.bedrag,regels:p.regels})}</div>
+    <div class="fl">Vinkt af in het onderhoudsschema<div class="taskpick">${groups}</div></div>
+    ${(p.regels||[]).length?`<details><summary>${p.regels.length} regels van de factuur</summary><table><tbody>${p.regels.map(r=>`<tr><td>${esc(r.omschr)}</td><td class="n">${r.bedrag!=null?eur(r.bedrag):""}</td></tr>`).join("")}</tbody></table></details>`:""}
+    ${p.notitie?`<p class="hint">${esc(p.notitie)}</p>`:""}
+    <div class="row"><button class="btn primary" type="submit">${p.editId?"Wijziging opslaan":"Opslaan"}</button>${p.taken||p.editId?`<button class="btn ghost" type="button" data-act="clearprefill">${p.editId?"Annuleren":"Leegmaken"}</button>`:""}</div>
+  </form>`;
+}
+function uitgaveList(items){
+  if(!items.length)return `<p class="empty">Nog niets vastgelegd.</p>`;
+  const v=V();
+  return `<div class="list">${items.sort((a,b)=>a.datum<b.datum?1:-1).map(u=>{const pre=voorAankoop(v,u),pc=prijsCheck(v,u);return `<div class="item"><span class="t">${esc(u.omschr)}</span><span class="r"${pre?' style="color:var(--muted);font-weight:500"':""}>${eur(u.bedrag)}</span>
+   <span class="m">${fdate(u.datum)} · ${esc(u.cat)}${u.km!=null?" · "+km(u.km):""}${(u.taken||[]).length?" · "+u.taken.length+" schema-punt"+(u.taken.length>1?"en":""):""}${pre?" · vorige eigenaar, telt niet mee":""}${pc?"<br>"+prijsChip(pc)+" "+esc(prijsUitleg(pc)):""}</span>
+   <span class="acts"><button class="btn small ghost" data-act="edit" data-id="${u.id}">Bewerken</button><button class="btn small ghost danger" data-act="del" data-kind="uitgave" data-id="${u.id}">Verwijderen</button></span>
+   ${(u.regels||[]).length||u.notitie||(pc&&(pc.uur||pc.oordeel==="hoog"||pc.oordeel==="duur"))?`<details class="m" style="grid-column:1 / -1"><summary>Details</summary>${(u.regels||[]).length?`<table><tbody>${u.regels.map(r=>`<tr><td>${esc(r.omschr)}</td><td class="n">${r.bedrag!=null?eur(r.bedrag):""}</td></tr>`).join("")}</tbody></table>`:""}${u.notitie?`<p>${esc(u.notitie)}</p>`:""}${pc&&pc.uur?`<p>Uurtarief op de factuur: ca. ${eur(pc.uur)} (gemiddeld ${eur0(UURTARIEF.gem)}, meestal ${eur0(UURTARIEF.min)}–${eur0(UURTARIEF.max)}).</p>`:""}${pc&&(pc.oordeel==="hoog"||pc.oordeel==="duur")?`<p><button class="btn small" data-act="monteur" data-id="${u.id}">Tekst voor monteur kopiëren</button></p>`:""}</details>`:""}
+   </div>`}).join("")}</div>`;
+}
+
+// ---------- Importeren van chatbot-tekst ----------
+let impResult=null, impText="", restoreArmed=0;
+function instructie(){return `Je typt foto's van auto- en motorpapieren over voor mijn app Autologboek. Op de foto staat een factuur, bon, tankbon, APK-rapport of onderhoudsboekje. Antwoord ALLEEN met tekst in het formaat hieronder, zonder uitleg ervoor of erna.
+
+Per document één blok. Scheid blokken met een regel met alleen ---
+
+Onderhoud, reparatie, onderdelen of aankoop:
+type: onderhoud
+kenteken: XX-123-X
+datum: DD-MM-JJJJ
+km: 123456
+soort: Onderhoud | Reparatie | Onderdelen | Aankoop | Overig
+omschrijving: korte samenvatting, noem de soort beurt als die op de factuur staat (bijv. kleine beurt, grote beurt, 20.000 km beurt)
+totaal: 123,45
+regel: omschrijving van de regel; 12,34
+regel: arbeid 1,5 uur; 120,00
+schema: codes uit de lijst hieronder, met komma's
+notitie: alleen als iets onduidelijk of afwijkend is
+
+APK-rapport:
+type: apk
+kenteken: XX-123-X
+datum: DD-MM-JJJJ
+km: 123456
+geldig tot: DD-MM-JJJJ
+totaal: 0
+omschrijving: APK goedgekeurd
+notitie: reparatie- of adviespunten
+
+Tankbon:
+type: tanken
+kenteken: XX-123-X
+datum: DD-MM-JJJJ
+km: 123456
+bedrag: 62,40
+liters: 31,25
+vol: ja
+
+Kentekenbewijs of RDW-gegevens van een voertuig:
+type: voertuig
+naam: merk en model
+soort: auto | motor
+kenteken: XX-123-X
+merk model: volledige typenaam
+brandstof: Benzine
+bouwjaar: 2020
+in bezit sinds: DD-MM-JJJJ
+km bij aankoop: 12345
+gegeven: naam van het gegeven; waarde
+last: naam van een vaste last per maand; bedrag; eventueel "niet in jan, feb"
+klus: een klusje voor de takenlijst
+
+Regels:
+- Bedragen in euro met komma, zonder euroteken. totaal = wat er betaald is, inclusief BTW. Staan de regels exclusief BTW, zet de BTW als eigen regel.
+- Zet bij arbeidsloon het aantal uren in de regel, zoals "arbeid 1,5 uur".
+- Laat doorgestreepte regels en regels voor een ander kenteken weg, en noem dat in notitie.
+- Een handgeschreven datum of km-stand op het papier gaat voor de factuurdatum.
+- Weet je iets niet zeker, laat die regel dan weg (geen gok).
+- km is de kilometerstand, niet de dagteller.
+- schema: kies alleen codes voor onderhoud dat volgens het document echt is gedaan.
+
+Codes voor een auto:
+${SCHEMAS.auto.map(t=>t.id+" = "+t.part+": "+t.actie.toLowerCase()).join("\n")}
+
+Codes voor een motor:
+${SCHEMAS.motor.map(t=>t.id+" = "+t.part+": "+t.actie.toLowerCase()).join("\n")}`}
+function parseDate(x){x=String(x||"").trim();let m=x.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);if(m)return m[1]+"-"+m[2].padStart(2,"0")+"-"+m[3].padStart(2,"0");
+  m=x.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/);if(!m)return null;let y=m[3];if(y.length===2)y="20"+y;
+  const d=m[1].padStart(2,"0"),mo=m[2].padStart(2,"0");if(+mo<1||+mo>12||+d<1||+d>31)return null;return y+"-"+mo+"-"+d}
+const normKent=k=>String(k||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+function splitLast(val){const i=Math.max(val.lastIndexOf(";"),val.lastIndexOf("|"));return i>0?[val.slice(0,i).trim(),val.slice(i+1).trim()]:[val.trim(),""]}
+function parseImport(text){
+  text=String(text||"").replace(/\r/g,"").replace(/```[a-zA-Z]*/g,"").replace(/\*\*/g,"");
+  const blocks=text.split(/^\s*-{3,}\s*$/m), items=[];
+  for(const blk of blocks){
+    const o={regels:[],schema:[],notitie:[],lasten:[],specs:[],klussen:[]};let any=false;
+    for(let line of blk.split("\n")){
+      line=line.replace(/^\s*[-*•]\s+/,"").trim(); if(!line||line.startsWith("#"))continue;
+      const m=line.match(/^([A-Za-zÀ-ÿ \-\/]+?)\s*:\s*(.*)$/); if(!m)continue;
+      const k=m[1].toLowerCase().replace(/[\s\-\/]+/g," ").trim(), val=m[2].trim(); any=true;
+      if(k==="type"||k==="document")o.type=val.toLowerCase();
+      else if(k==="kenteken")o.kenteken=val;
+      else if(k==="naam")o.naam=val;
+      else if(k==="datum")o.datum=parseDate(val);
+      else if(["km","km stand","kilometerstand","tellerstand"].includes(k))o.km=parseKm(val);
+      else if(k==="km bij aankoop")o.startKm=parseKm(val);
+      else if(k==="soort"||k==="categorie")o.soort=val;
+      else if(k==="omschrijving")o.omschr=val;
+      else if(k==="totaal"||k==="bedrag")o.bedrag=parseNum(val);
+      else if(k==="liters")o.liters=parseNum(val);
+      else if(k==="vol"||k==="volle tank")o.vol=!/^(nee|n|no|false|0)$/i.test(val);
+      else if(k==="regel"){const [a,b]=splitLast(val);o.regels.push({omschr:a,bedrag:b?parseNum(b):null})}
+      else if(k==="schema"||k==="taken")o.schema.push(...val.split(/[,;\s]+/).map(x=>x.trim().toLowerCase()).filter(Boolean));
+      else if(k==="geldig tot"||k==="apk geldig tot"||k==="apk")o.apkTot=parseDate(val);
+      else if(k==="notitie"||k==="opmerking")o.notitie.push(val);
+      else if(k==="merk model"||k==="merk en model"||k==="model"||k==="type voertuig")o.merkModel=val;
+      else if(k==="brandstof")o.brandstof=val;
+      else if(k==="bouwjaar")o.bouwjaar=val;
+      else if(k==="in bezit sinds"||k==="eigendom sinds"||k==="gekocht op")o.sinds=parseDate(val);
+      else if(k==="verbruik"||k==="fabrieksverbruik")o.nedc=parseNum(val);
+      else if(k==="last"){const p=val.split(/[;|]/).map(x=>x.trim());const n=parseNum(p[1]);if(p[0]&&n!=null){const niet=parseMaanden(p.slice(2).join(" "));o.lasten.push(niet.length?{naam:p[0],bedrag:Math.abs(n),niet}:{naam:p[0],bedrag:Math.abs(n)})}}
+      else if(k==="gegeven"){const [a,b]=splitLast(val);if(a)o.specs.push([a,b])}
+      else if(k==="klus"||k==="klusje")o.klussen.push(val);
+    }
+    if(!any)continue;
+    if(!o.type)o.type=o.liters!=null?"tanken":o.apkTot&&!o.merkModel?"apk":(o.omschr||o.bedrag!=null)?"onderhoud":o.merkModel?"voertuig":"km";
+    items.push(o);
+  }
+  return items;
+}
+function isEmptyVehicle(v){return !v.kenteken&&!v.fuel.length&&!v.uitgaven.length&&!v.merkModel}
+function checkImport(items){
+  const plan={}, soortPlan={}, used=new Set();
+  const veh=items.filter(o=>o.type==="voertuig").map(o=>{
+    const warn=[]; let tgt=o.kenteken?state.vehicles.find(x=>x.kenteken&&normKent(x.kenteken)===normKent(o.kenteken)):null, nieuw=false;
+    if(!tgt){tgt=state.vehicles.find(x=>isEmptyVehicle(x)&&!used.has(x.id));nieuw=!!tgt}
+    if(tgt){used.add(tgt.id);if(o.kenteken)plan[normKent(o.kenteken)]=tgt.id;if(o.soort)soortPlan[tgt.id]=/motor/i.test(o.soort)?"motor":"auto"}
+    else warn.push("geen lege plek voor een nieuw voertuig");
+    const ok=!!tgt&&!!(o.naam||o.kenteken);
+    if(!o.naam&&!o.kenteken)warn.push("geen naam of kenteken");
+    return {...o,vid:tgt?tgt.id:null,nieuw,veh:true,fuel:false,warn,ok,sel:ok};
+  });
+  const rest=items.filter(o=>o.type!=="voertuig").map(o=>{
+    const warn=[]; let v=V();
+    if(o.kenteken){const id=plan[normKent(o.kenteken)];const f=id?state.vehicles.find(x=>x.id===id):state.vehicles.find(x=>x.kenteken&&normKent(x.kenteken)===normKent(o.kenteken));if(f)v=f;else warn.push("kenteken "+o.kenteken+" niet gevonden, komt bij "+V().naam)}
+    const soort=soortPlan[v.id]||soortOf(v), vs={...v,soort};
+    const fuel=o.type==="tanken"||o.type==="km"||o.type==="kmstand";
+    const valid=new Set(SCHEMAS[soort].map(t=>t.id));
+    const unknown=o.schema.filter(id=>!valid.has(id)); if(unknown.length)warn.push("code hoort niet bij deze "+soort+": "+unknown.join(", "));
+    o.schema=o.schema.filter(id=>valid.has(id));
+    let ok=true;
+    if(!o.datum){warn.push("geen geldige datum");ok=false}
+    if(fuel&&o.km==null){warn.push("geen km-stand");ok=false}
+    if(!fuel&&!o.omschr&&o.type!=="apk"){warn.push("geen omschrijving");ok=false}
+    const cur=currentKm(v); if(o.km!=null&&cur!=null&&o.km>cur+20000)warn.push("km-stand veel hoger dan nu ("+km(cur)+"), klopt die?");
+    let dup=false;
+    if(fuel)dup=v.fuel.some(f=>f.datum===o.datum&&f.km===o.km);
+    else dup=v.uitgaven.some(u=>u.datum===o.datum&&Math.abs((u.bedrag||0)-(o.bedrag||0))<0.01);
+    if(dup)warn.push("staat er al in");
+    const regSum=o.regels.reduce((a,r)=>a+(r.bedrag||0),0);
+    if(!fuel&&o.regels.length&&o.bedrag!=null&&Math.abs(regSum-o.bedrag)>0.05)warn.push("regels tellen op tot "+eur(regSum)+", totaal is "+eur(o.bedrag));
+    const cat=catVan(o);
+    const pc=fuel?null:prijsCheck(vs,{cat,omschr:o.omschr||"",bedrag:o.bedrag||0,regels:o.regels});
+    return {...o,vid:v.id,fuel,warn,ok,sel:ok&&!dup,cat,pc};
+  });
+  return veh.concat(rest);
+}
+function catVan(o){const low=x=>String(x||"").toLowerCase();return o.type==="apk"?"APK":(CATS.find(c=>low(c)===low(o.soort))||CATS.find(c=>low(c)===low(o.type))||"Onderhoud")}
+function importCard(v){
+  const r=impResult;
+  return `<div class="card" id="impcard"><h2>Plakken van chatbot</h2>
+   <p class="hint">Laat een chatbot een foto van je factuur, bon, APK-rapport of kentekenbewijs overtypen. Geef hem eerst de instructie (knop hieronder), dan de foto. Plak zijn antwoord hier.</p>
+   <div class="row"><button class="btn" data-act="copyinstr">Instructie kopiëren</button><button class="btn" data-act="pasteclip">Plak uit klembord</button></div>
+   <details><summary>Instructie bekijken</summary><pre class="instr">${esc(instructie())}</pre></details>
+   <form class="f" data-form="import"><textarea class="imp" id="imp-txt" name="txt" placeholder="type: onderhoud&#10;datum: 17-04-2026&#10;km: 104638&#10;omschrijving: Grote beurt&#10;totaal: 349,16" autocomplete="off" autocapitalize="off" spellcheck="false">${esc(impText)}</textarea>
+    <div><button class="btn primary" type="submit">Controleren</button></div></form>
+   ${r?(r.length?`<div class="list">${r.map((o,i)=>{const veh=state.vehicles.find(x=>x.id===o.vid);
+     const title=o.veh?"Voertuig: "+(o.naam||o.kenteken):o.fuel?(o.bedrag?"Tanken: "+eur(o.bedrag)+(o.liters?", "+nl2.format(o.liters)+" l":""):"Km-stand"):(o.omschr||"APK");
+     const meta=o.veh?[o.kenteken,o.soort,veh?(o.nieuw?"komt op de plek van "+veh.naam:"werkt "+veh.naam+" bij"):"",o.specs.length?o.specs.length+" gegevens":"",o.lasten.length?o.lasten.length+" vaste lasten":"",o.klussen.length?o.klussen.length+" klusjes":""].filter(Boolean).map(esc).join(" · ")
+       :fdate(o.datum)+" · "+esc(veh?veh.naam:"")+(o.km!=null?" · "+km(o.km):"")+(!o.fuel?" · "+esc(o.cat):"")+(o.regels.length?" · "+o.regels.length+" regels":"")+(o.schema.length?" · vinkt af: "+o.schema.map(id=>esc(TASK[id].part.toLowerCase())).join(", "):"")+(o.apkTot?" · APK tot "+fdate(o.apkTot):"")+(o.pc?"<br>"+prijsChip(o.pc)+" "+esc(prijsUitleg(o.pc)):"");
+     return `<label class="item" for="imp-${i}" style="cursor:pointer"><span class="t"><input type="checkbox" id="imp-${i}" data-act="impsel" data-i="${i}"${o.sel?" checked":""}${o.ok?"":" disabled"} style="width:18px;height:18px;vertical-align:-3px;margin-right:6px;accent-color:var(--accent)">${esc(title)}</span>
+      <span class="r">${!o.fuel&&!o.veh&&o.bedrag!=null?eur(o.bedrag):""}</span>
+      <span class="m">${meta}${o.warn.length?`<br><span style="color:var(--warn)">Let op: ${esc(o.warn.join("; "))}</span>`:""}</span></label>`}).join("")}</div>
+     <div class="row"><button class="btn primary" data-act="impadd">${r.filter(o=>o.sel).length} toevoegen</button><button class="btn ghost" data-act="impclear">Annuleren</button></div>`
+     :`<p class="empty">Ik vond niets om te importeren. Klopt het formaat? Elke regel is "naam: waarde", blokken gescheiden door ---.</p>`):""}
+  </div>`;
+}
+function doImport(){
+  let n=0; const list=impResult||[];
+  for(const o of list.filter(x=>x.veh&&x.sel)){ const v=state.vehicles.find(x=>x.id===o.vid); if(!v)continue;
+    if(o.naam)v.naam=o.naam; if(o.kenteken)v.kenteken=o.kenteken.toUpperCase(); if(o.soort)v.soort=/motor/i.test(o.soort)?"motor":"auto";
+    if(o.merkModel)v.merkModel=o.merkModel; if(o.brandstof)v.brandstof=o.brandstof; if(o.bouwjaar)v.bouwjaar=o.bouwjaar;
+    if(o.sinds)v.eigendomSinds=o.sinds; if(o.startKm!=null)v.startKm=o.startKm; if(o.nedc!=null)v.nedc=o.nedc; if(o.apkTot)v.apk=o.apkTot;
+    if(o.lasten.length)v.lasten=o.lasten; if(o.specs.length)v.specs=o.specs;
+    o.klussen.forEach(t=>{if(!v.klusjes.some(k=>k.tekst.toLowerCase()===t.toLowerCase()))v.klusjes.push({id:uid(),tekst:t,klaar:false})});
+    n++; }
+  for(const o of list.filter(x=>!x.veh&&x.sel)){ const v=state.vehicles.find(x=>x.id===o.vid); if(!v)continue;
+    if(o.fuel){v.fuel.push({id:uid(),datum:o.datum,km:o.km,bedrag:o.bedrag||null,liters:o.liters||null,vol:o.type==="tanken"?(o.vol!==false):false})}
+    else{addUitgave(v,{datum:o.datum,km:o.km??null,cat:o.cat,omschr:o.omschr||(o.apkTot?"APK goedgekeurd, geldig tot "+fdate(o.apkTot):"APK"),bedrag:o.bedrag||0,taken:o.schema,regels:o.regels,notitie:o.notitie.join(" "),apkGeldigTot:o.apkTot||null});
+      if(o.km!=null&&days(o.datum,todayIso())<=31&&!v.fuel.some(f=>f.km===o.km))v.fuel.push({id:uid(),datum:o.datum,km:o.km,bedrag:null,liters:null,vol:false});}
+    n++; }
+  impResult=null; impText=""; save(); render(); toast(n===1?"1 onderdeel toegevoegd":n+" onderdelen toegevoegd");
+}
+
+function dupOf(v,d){return v.uitgaven.find(u=>u.datum===d.datum&&Math.abs((u.bedrag||0)-(d.bedrag||0))<0.01)}
+function addUitgave(v,d){
+  v.uitgaven.push({id:uid(),datum:d.datum,km:d.km??null,cat:d.cat,omschr:d.omschr,bedrag:d.bedrag||0,taken:d.taken||[],regels:d.regels||[],notitie:d.notitie||""});
+  if(d.apkGeldigTot&&(!v.apk||d.apkGeldigTot>v.apk))v.apk=d.apkGeldigTot;
+}
+function vOnderhoud(v){
+  const st=taskStatus(v); const g=k=>st.filter(s=>s.status===k);
+  const t1due=st.filter(s=>s.mnd===1&&s.status!=="ok");
+  const hist=v.uitgaven.filter(u=>u.cat!=="Aankoop"&&u.cat!=="Overig");
+  return `<div class="grid two">
+   <div class="grid">
+    <div class="card"><div class="card-head"><h2>Komend onderhoud</h2><span class="sub">Huidige stand ${km(currentKm(v))}</span></div>
+      ${t1due.length>1?`<div class="row"><button class="btn" data-act="monthly">Alle maandelijkse controles gedaan</button></div>`:""}
+      ${["over","binnenkort"].some(k=>g(k).length)?`<div class="list">${g("over").concat(g("binnenkort")).map(dueRow).join("")}</div>`:`<p class="empty">Niets dat nu of binnenkort moet.</p>`}
+      ${g("ok").length?`<details><summary>${g("ok").length} punten in orde</summary><div class="list">${g("ok").map(dueRow).join("")}</div></details>`:""}
+      ${g("onbekend").length?`<details${g("onbekend").length===tasksFor(v).length?" open":""}><summary>${g("onbekend").length} punten zonder datum</summary><p class="hint">Stel bij Gegevens een startpunt in (datum en km van de laatste beurt), of tik op Gedaan bij wat je weet.</p><div class="list">${g("onbekend").map(dueRow).join("")}</div></details>`:""}
+    </div>
+    ${importCard(v)}
+    <div class="card" id="logcard"><h2>${prefill&&prefill.editId?"Onderhoud bewerken":"Onderhoud vastleggen"}</h2>${uitgaveForm(v,prefill)}</div>
+   </div>
+   <div class="grid">
+    <div class="card"><h2>Gedaan onderhoud</h2>${uitgaveList(hist)}</div>
+    <div class="card"><h2>Onderhoudsschema ${soortOf(v)==="motor"?"motor":"auto"}</h2><div class="scroll"><table><thead><tr><th>Onderdeel</th><th>Wat</th><th>Wanneer</th><th class="n">Richtprijs</th></tr></thead>
+     <tbody>${tasksFor(v).map(t=>`<tr><td>${esc(t.part)}</td><td>${esc(t.actie)}</td><td>${esc(intervalLabel(t))}</td><td class="n">${esc(taakPrijs(v,t.id).replace("ca. ",""))}</td></tr>`).join("")}</tbody></table></div>
+     <p class="hint">Wat het eerst komt, km of tijd, telt.${soortOf(v)==="auto"?" Bij een bereik in je schema rekent de app met de veilige kant.":""} Het schema hangt af van de soort voertuig (auto of motor) bij Gegevens.</p></div>
+   </div></div>`;
+}
+
+function vKosten(v){
+  const c=costs(v);
+  const rows=[["Aankoop",c.aankoop],["Onderhoud & reparaties",c.onderhoud],["Brandstof",c.brandstof],["Vaste lasten",c.vast],["Overig",c.overig]];
+  const max=Math.max(1,...rows.map(r=>r[1]));
+  // per maand (variabele kosten)
+  const pm={};const add=(d,k,n)=>{if(!d||!n)return;const key=d.slice(0,7);pm[key]=pm[key]||{b:0,o:0};pm[key][k]+=n};
+  v.fuel.filter(e=>!v.eigendomSinds||e.datum>=v.eigendomSinds).forEach(e=>add(e.datum,"b",e.bedrag));eigenUitgaven(v).filter(u=>u.cat!=="Aankoop").forEach(u=>add(u.datum,"o",u.bedrag));
+  const months=Object.keys(pm).sort().reverse().slice(0,12);
+  return `<div class="grid">
+   <div class="tiles">
+    <div class="tile"><span class="lab">Totaal tot nu</span><span class="val">${eur0(c.totaal)}</span><span class="note">sinds ${fdate(v.eigendomSinds)}</span></div>
+    <div class="tile"><span class="lab">Zonder verzekering & belasting</span><span class="val">${eur0(c.exclVast)}</span><span class="note">zoals in je spreadsheet</span></div>
+    <div class="tile"><span class="lab">Per maand vast</span><span class="val">${eur(c.perMaand)}</span><span class="note">${v.lasten.map(l=>esc(l.naam)+((l.niet||[]).length?" (niet in "+esc(maandNamen(l.niet))+")":"")).join(" + ")||"geen vaste lasten"}</span></div>
+    <div class="tile"><span class="lab">Per gereden km</span><span class="val">${c.gereden>0?eur((c.totaal-c.aankoop)/c.gereden):"—"}</span><span class="note">${c.gereden>0?"excl. aankoop, over "+km(c.gereden)+" sinds "+km(c.first):"nog te weinig km-standen"}</span></div>
+   </div>
+   <div class="grid two">
+    <div class="grid">
+     <div class="card"><h2>Waar het geld heen gaat</h2><div class="bars">${rows.map(([l,n])=>`<div class="bar"><div class="bl"><span>${l}</span><span class="num">${eur(n)}</span></div><div class="track"><div class="fill" style="width:${(n/max*100).toFixed(1)}%"></div></div></div>`).join("")}</div>
+      <p class="hint">Vaste lasten: ${c.maanden} volle maanden${v.lasten.some(l=>(l.niet||[]).length)?", zonder de maanden waarin een last niet betaald wordt,":" × "+eur(c.perMaand)} samen ${eur(c.vast)}. Aanpassen bij Gegevens.${c.vorig?` Facturen van vóór de aankoop (${eur(c.vorig)}, vorige eigenaar) staan in de lijst maar tellen niet mee.`:""}</p></div>
+     ${prijsCard(v)}
+     <div class="card"><h2>Per maand</h2>${months.length?`<div class="scroll"><table><thead><tr><th>Maand</th><th class="n">Brandstof</th><th class="n">Onderhoud e.d.</th><th class="n">Vast</th><th class="n">Totaal</th></tr></thead><tbody>
+      ${months.map(k=>{const[y,m]=k.split("-");const r=pm[k];return `<tr><td>${MAANDEN[+m-1]} ${y}</td><td class="n">${eur(r.b)}</td><td class="n">${eur(r.o)}</td><td class="n">${eur(lastenInMaand(v,+m))}</td><td class="n">${eur(r.b+r.o+lastenInMaand(v,+m))}</td></tr>`}).join("")}</tbody></table></div>`:`<p class="empty">Zodra je tankt of onderhoud vastlegt, zie je hier de maanden.</p>`}</div>
+    </div>
+    <div class="grid">
+     <div class="card" id="logcard"><h2>${prefill&&prefill.editId?"Uitgave bewerken":"Uitgave toevoegen"}</h2>${uitgaveForm(v,prefill||{cat:"Overig"})}</div>
+     <div class="card"><h2>Alle uitgaven</h2>${uitgaveList([...v.uitgaven])}</div>
+    </div>
+   </div></div>`;
+}
+
+function prijsCard(v){
+  const checked=eigenUitgaven(v).map(u=>({u,pc:prijsCheck(v,u)})).filter(x=>x.pc).sort((a,b)=>a.u.datum<b.u.datum?1:-1);
+  const flag=checked.filter(x=>x.pc.oordeel==="hoog"||x.pc.oordeel==="duur");
+  return `<div class="card"><div class="card-head"><h2>Prijscheck</h2><span class="sub">${checked.length} post${checked.length===1?"":"en"} vergeleken</span></div>
+   ${checked.length?`<div class="list">${checked.map(({u,pc})=>`<div class="item"><span class="t">${esc(u.omschr)}</span><span class="r">${eur(u.bedrag)}</span><span class="m">${fdate(u.datum)} · ${prijsChip(pc)} ${esc(prijsUitleg(pc))}</span>${pc.oordeel==="hoog"||pc.oordeel==="duur"?`<span class="acts"><button class="btn small" data-act="monteur" data-id="${u.id}">Tekst voor monteur</button></span>`:""}</div>`).join("")}</div>`:`<p class="empty">Nog geen onderhoud om te vergelijken. Posten met alleen losse onderdelen vergelijkt de app niet.</p>`}
+   ${flag.length?`<p class="hint" style="color:var(--ink)">${flag.length===1?"1 post is":flag.length+" posten zijn"} duurder dan gebruikelijk. Vraag je monteur gerust waar het verschil zit; soms zitten er extra onderdelen of werk in.</p>`:""}
+   <details><summary>Wat kost het normaal? (${soortOf(v)})</summary><table><tbody>${PRIJZEN[soortOf(v)].map(p=>`<tr><td>${esc(p.naam)}</td><td class="n">${eur0(p.min)}–${eur0(p.max)}</td></tr>`).join("")}<tr><td>Uurtarief garage</td><td class="n">gem. ${eur0(UURTARIEF.gem)} (${eur0(UURTARIEF.min)}–${eur0(UURTARIEF.max)})</td></tr></tbody></table><p class="hint">${esc(PRIJSBRON)}</p></details>
+  </div>`;
+}
+function prijsHint(v,u){
+  const m=matchPrijzen(v,u||{}); if(!m)return "";
+  const b=u.bedrag>0?u.bedrag:null; const pc=b?prijsCheck(v,{...u,bedrag:b}):null;
+  return pc?prijsChip(pc)+" "+esc(prijsUitleg(pc)):"Normaal kost dit "+esc(prijsUitleg({...m,oordeel:"normaal"}).replace("richtprijs ",""));
+}
+
+function vKlusjes(v){
+  const open=v.klusjes.filter(k=>!k.klaar),klaar=v.klusjes.filter(k=>k.klaar);
+  const row=k=>`<div class="todo${k.klaar?" done":""}"><input type="checkbox" id="k-${k.id}" data-act="klus" data-id="${k.id}"${k.klaar?" checked":""} style="width:20px;height:20px;accent-color:var(--accent);margin-top:2px"><label class="t" for="k-${k.id}">${esc(k.tekst)}</label><button class="btn small ghost danger" data-act="del" data-kind="klus" data-id="${k.id}">Verwijderen</button></div>`;
+  return `<div class="grid two"><div class="card"><div class="card-head"><h2>Klusjes</h2><span class="sub">${open.length} open · ${klaar.length} klaar</span></div>
+   <form class="f" data-form="klus"><div class="row"><label class="fl" for="k-new" style="flex:1">Nieuw klusje<input type="text" id="k-new" name="tekst" placeholder="bijv. Ruitenwissers vervangen" required autocomplete="off"></label><button class="btn primary" type="submit" style="align-self:flex-end">Toevoegen</button></div></form>
+   <div>${open.length?open.map(row).join(""):`<p class="empty">Geen open klusjes.</p>`}</div>
+   ${klaar.length?`<details><summary>${klaar.length} afgerond</summary><div>${klaar.map(row).join("")}</div></details>`:""}
+  </div></div>`;
+}
+
+function vGegevens(v){
+  const ss=v.schemaStart||{};
+  return `<div class="grid two"><div class="grid">
+   <div class="card"><h2>Voertuig</h2>
+    <form class="f" data-form="voertuig">
+     <div class="fields">
+      <label class="fl" for="g-naam">Naam<input type="text" id="g-naam" name="naam" value="${esc(v.naam)}" required></label>
+      <label class="fl" for="g-soort">Soort voertuig<select id="g-soort" name="soort"><option value="auto"${soortOf(v)==="auto"?" selected":""}>Auto</option><option value="motor"${soortOf(v)==="motor"?" selected":""}>Motor</option></select></label>
+      <label class="fl" for="g-kent">Kenteken<input type="text" id="g-kent" name="kenteken" value="${esc(v.kenteken)}" placeholder="XX-123-X" autocomplete="off"></label>
+      <label class="fl" for="g-mm">Merk en model<input type="text" id="g-mm" name="merkModel" value="${esc(v.merkModel)}"></label>
+      <label class="fl" for="g-bf">Brandstof<input type="text" id="g-bf" name="brandstof" value="${esc(v.brandstof)}" placeholder="Benzine"></label>
+      <label class="fl" for="g-bj">Bouwjaar<input type="text" id="g-bj" name="bouwjaar" inputmode="numeric" value="${esc(v.bouwjaar)}"></label>
+      <label class="fl" for="g-apk">APK geldig tot<input type="date" id="g-apk" name="apk" value="${esc(v.apk)}"></label>
+      <label class="fl" for="g-sinds">In bezit sinds<input type="date" id="g-sinds" name="eigendomSinds" value="${esc(v.eigendomSinds)}"></label>
+      <label class="fl" for="g-skm">Km-stand bij aankoop<input type="text" id="g-skm" name="startKm" inputmode="numeric" value="${v.startKm??""}" placeholder="optioneel"></label>
+      <label class="fl" for="g-nedc">Fabrieksverbruik (l/100 km)<input type="text" id="g-nedc" name="nedc" inputmode="decimal" value="${v.nedc!=null?String(v.nedc).replace(".",","):""}"></label>
+     </div>
+     <div class="fl">Startpunt onderhoudsschema<span class="hint" style="font-weight:400">Datum en km-stand van de laatste volledige beurt. Alles wat je nog niet apart hebt vastgelegd, rekent vanaf hier.</span></div>
+     <div class="fields">
+      <label class="fl" for="g-ssd">Datum laatste beurt<input type="date" id="g-ssd" name="ssDatum" value="${esc(ss.datum||"")}"></label>
+      <label class="fl" for="g-ssk">Km bij laatste beurt<input type="text" id="g-ssk" name="ssKm" inputmode="numeric" value="${ss.km??""}"></label>
+     </div>
+     <label class="fl" for="g-lasten">Vaste lasten per maand (één per regel: naam: bedrag, eventueel "(niet in jan, feb, dec)")<textarea id="g-lasten" name="lasten" style="min-height:80px">${esc(v.lasten.map(lastTekst).join("\n"))}</textarea></label>
+     <label class="fl" for="g-specs">Overige gegevens (één per regel: eigenschap: waarde)<textarea id="g-specs" name="specs">${esc(v.specs.map(([k,x])=>k+": "+x).join("\n"))}</textarea></label>
+     <div><button class="btn primary" type="submit">Gegevens opslaan</button></div>
+    </form>
+   </div></div>
+   <div class="grid">
+    <div class="card" id="backupcard"><h2>Back-up</h2>
+     <p class="hint">Je gegevens staan alleen op deze telefoon. ${state.lastBackup?"Laatste back-up: "+fdate(state.lastBackup.slice(0,10))+".":"Je hebt nog geen back-up."} Bewaar de back-up in iCloud Drive, dan ben je niets kwijt als je telefoon stuk gaat.</p>
+     <div class="row"><button class="btn primary" data-act="backup">Back-up maken</button><button class="btn" data-act="copy">Kopieer als tekst</button></div>
+     <form class="f" data-form="restore"><label class="fl" for="r-txt">Back-up of startbestand terugzetten<textarea id="r-txt" name="txt" style="min-height:70px" placeholder="Kies een bestand of plak de tekst" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
+      <div class="row"><label class="btn" for="r-file">Bestand kiezen</label><input type="file" id="r-file" accept=".json,.txt,application/json,text/plain" data-act="file" style="position:absolute;width:1px;height:1px;opacity:0"><button class="btn danger" type="submit" id="r-submit">Terugzetten (vervangt alles)</button></div></form>
+    </div>
+   </div></div>`;
+}
+
+// ---------- Acties ----------
+let toastT=null;
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.style.display="block";clearTimeout(toastT);toastT=setTimeout(()=>t.style.display="none",3800)}
+function setTab(t){tab=t;try{localStorage.setItem("autologboek-tab",t)}catch(e){}try{history.replaceState(null,"","#"+t)}catch(e){}render();window.scrollTo(0,0)}
+
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]"); if(!b)return; const a=b.dataset.act, v=V();
+  if(a==="vehicle"){state.active=b.dataset.id;prefill=null;impResult=null;save();render()}
+  else if(a==="tab"||a==="goto"){setTab(b.dataset.tab)}
+  else if(a==="toggle-tank"){const on=b.checked;document.getElementById("tankvelden").style.display=on?"":"none";document.getElementById("volrij").style.display=on?"":"none"}
+  else if(a==="done"){const t=TASK[b.dataset.task];prefill={cat:"Onderhoud",omschr:t.part+": "+t.actie.toLowerCase(),bedrag:0,taken:[t.id]};
+    if(tab!=="onderhoud")setTab("onderhoud");else render();document.getElementById("logcard")?.scrollIntoView({behavior:"smooth",block:"start"})}
+  else if(a==="monthly"){const ids=tasksFor(v).filter(t=>t.mnd===1).map(t=>t.id);v.uitgaven.push({id:uid(),datum:todayIso(),km:currentKm(v),cat:"Onderhoud",omschr:"Maandelijkse controle",bedrag:0,taken:ids});save();render();toast("Maandelijkse controle vastgelegd")}
+  else if(a==="clearprefill"){prefill=null;render()}
+  else if(a==="edit"){const u=v.uitgaven.find(x=>x.id===b.dataset.id);if(!u)return;prefill={...JSON.parse(JSON.stringify(u)),editId:u.id};
+    if(tab!=="onderhoud"&&tab!=="kosten")setTab("onderhoud");else render();document.getElementById("logcard")?.scrollIntoView({behavior:"smooth",block:"start"})}
+  else if(a==="del"){
+    if(!b.classList.contains("armed")){b.classList.add("armed");b.textContent="Zeker?";setTimeout(()=>{if(b.isConnected){b.classList.remove("armed");b.textContent="Verwijderen"}},3000);return}
+    const k=b.dataset.kind,id=b.dataset.id;
+    if(k==="fuel")v.fuel=v.fuel.filter(x=>x.id!==id);if(k==="uitgave")v.uitgaven=v.uitgaven.filter(x=>x.id!==id);if(k==="klus")v.klusjes=v.klusjes.filter(x=>x.id!==id);
+    save();render();toast("Verwijderd")}
+  else if(a==="copy"){const txt=backupText();navigator.clipboard.writeText(txt).then(()=>{state.lastBackup=new Date().toISOString();save();render();toast("Back-up gekopieerd. Plak hem in Notities en bewaar hem.")},()=>{const r=document.getElementById("r-txt");r.value=txt;r.select();toast("Kopiëren lukte niet automatisch. De tekst staat geselecteerd in het vak; kopieer hem zelf.")})}
+  else if(a==="backup"){exportBackup()}
+  else if(a==="monteur"){const u=v.uitgaven.find(x=>x.id===b.dataset.id),pc=u&&prijsCheck(v,u);if(!pc)return;navigator.clipboard.writeText(monteurTekst(v,u,pc)).then(()=>toast("Tekst gekopieerd. Plak hem in een bericht aan je monteur."),()=>toast("Kopiëren lukte niet."))}
+  else if(a==="gotobackup"){setTab("gegevens");setTimeout(()=>document.getElementById("backupcard")?.scrollIntoView({behavior:"smooth",block:"start"}),50)}
+  else if(a==="copyinstr"){navigator.clipboard.writeText(instructie()).then(()=>toast("Instructie gekopieerd. Plak hem in de chatbot, stuur daarna de foto."),()=>toast("Kopiëren lukte niet. Open 'Instructie bekijken' en kopieer de tekst zelf."))}
+  else if(a==="pasteclip"){navigator.clipboard.readText().then(t=>{if(!t){toast("Het klembord is leeg.");return}impText=t;impResult=checkImport(parseImport(t));render();document.getElementById("impcard")?.scrollIntoView({behavior:"smooth",block:"start"})},()=>toast("Plakken mag niet automatisch. Tik in het vak en kies Plak."))}
+  else if(a==="impadd"){doImport()}
+  else if(a==="impclear"){impResult=null;impText="";render()}
+});
+document.addEventListener("input",e=>{
+  const f=e.target.closest&&e.target.closest('form[data-form="uitgave"]'); if(!f)return;
+  const h=f.querySelector("#prijshint"); if(!h)return;
+  h.innerHTML=prijsHint(V(),{cat:f.querySelector("#u-cat").value,omschr:f.querySelector("#u-omschr").value,bedrag:parseNum(f.querySelector("#u-bedrag").value),regels:(prefill&&prefill.regels)||[]});
+});
+document.addEventListener("change",e=>{
+  if(e.target.id==="u-cat"){e.target.dispatchEvent(new Event("input",{bubbles:true}))}
+  const t=e.target;
+  if(t.dataset.act==="impsel"&&impResult){impResult[+t.dataset.i].sel=t.checked;const btn=document.querySelector('[data-act="impadd"]');if(btn)btn.textContent=impResult.filter(o=>o.sel).length+" toevoegen";return}
+  if(t.dataset.act==="klus"){const k=V().klusjes.find(x=>x.id===t.dataset.id);if(k){k.klaar=t.checked;save();render()}}
+  if(t.dataset.act==="file"&&t.files[0]){t.files[0].text().then(s=>{document.getElementById("r-txt").value=s;try{const st=parseBackup(s);toast("Bestand gelezen: "+st.vehicles.filter(v=>v.kenteken||v.uitgaven.length).length+" voertuig(en). Tik op Terugzetten.")}catch(e){toast("Dit is geen back-up of startbestand van Autologboek.")}})}
+});
+document.addEventListener("submit",e=>{
+  e.preventDefault(); const f=e.target, d=new FormData(f), v=V(), kind=f.dataset.form;
+  if(kind==="fuel"){
+    const kmv=parseKm(d.get("km")); if(kmv==null){toast("Vul de km-stand in");return}
+    const getankt=!!d.get("getankt"), bedrag=getankt?parseNum(d.get("bedrag")):null, liters=getankt?parseNum(d.get("liters")):null;
+    if(getankt&&!bedrag&&!liters){toast("Vul het bedrag of de liters in, of vink 'Ik heb getankt' uit");return}
+    const cur=currentKm(v);
+    const before=taskStatus(v).filter(s=>s.status==="over"||s.status==="binnenkort").length;
+    v.fuel.push({id:uid(),datum:d.get("datum")||todayIso(),km:kmv,bedrag:bedrag||null,liters:liters||null,vol:getankt?!!d.get("vol"):false});
+    save(); render();
+    const seg=segments(v), last=seg[seg.length-1], due=taskStatus(v).filter(s=>s.status==="over"||s.status==="binnenkort");
+    let msg="Opgeslagen: "+km(kmv);
+    if(cur!=null&&kmv<cur)msg+=" (lager dan je vorige stand van "+km(cur)+", klopt dat?)";
+    else if(last&&last.id===v.fuel[v.fuel.length-1].id)msg+=last.liters?" · 1 op "+nl1.format(last.km/last.liters):" · "+eur(last.euro/last.km*100)+"/100 km";
+    if(due.length>before)msg+=" · Let op: "+due[0].part.toLowerCase()+" komt eraan";
+    toast(msg);
+  }
+  else if(kind==="uitgave"){
+    const omschr=String(d.get("omschr")||"").trim(); if(!omschr){toast("Vul in wat er gedaan is");return}
+    const p=prefill||{};
+    const entry={datum:d.get("datum")||todayIso(),km:parseKm(d.get("km")),cat:d.get("cat"),omschr,bedrag:parseNum(d.get("bedrag"))||0,taken:d.getAll("taak"),regels:p.regels||[],notitie:p.notitie||"",apkGeldigTot:p.apkGeldigTot||null};
+    if(p.editId){const u=v.uitgaven.find(x=>x.id===p.editId);if(u)Object.assign(u,{datum:entry.datum,km:entry.km,cat:entry.cat,omschr,bedrag:entry.bedrag,taken:entry.taken})}
+    else addUitgave(v,entry);
+    prefill=null; save(); render(); toast((p.editId?"Gewijzigd: ":"Vastgelegd: ")+omschr);
+  }
+  else if(kind==="klus"){const t=String(d.get("tekst")||"").trim();if(t){v.klusjes.unshift({id:uid(),tekst:t,klaar:false});save();render();document.getElementById("k-new")?.focus()}}
+  else if(kind==="voertuig"){
+    v.naam=String(d.get("naam")||"").trim()||v.naam; v.soort=d.get("soort")==="motor"?"motor":"auto";
+    ["kenteken","merkModel","brandstof","bouwjaar","apk","eigendomSinds"].forEach(k=>v[k]=String(d.get(k)||"").trim());
+    v.kenteken=v.kenteken.toUpperCase();
+    v.startKm=parseKm(d.get("startKm")); v.nedc=parseNum(d.get("nedc"));
+    const sd=String(d.get("ssDatum")||""), sk=parseKm(d.get("ssKm"));
+    v.schemaStart=(sd||sk!=null)?{datum:sd||null,km:sk}:null;
+    v.lasten=String(d.get("lasten")||"").split("\n").map(l=>parseLastRegel(l.trim())).filter(Boolean);
+    v.specs=String(d.get("specs")||"").split("\n").map(l=>{const i=l.indexOf(":");return i<0?null:[l.slice(0,i).trim(),l.slice(i+1).trim()]}).filter(x=>x&&x[0]);
+    save(); render(); toast("Gegevens opgeslagen");
+  }
+  else if(kind==="restore"){
+    let st; try{st=parseBackup(d.get("txt"))}catch(x){toast("Dit is geen geldige back-up. Kies het bestand of plak de volledige tekst.");return}
+    const btn=document.getElementById("r-submit");
+    if(hasData()&&Date.now()-restoreArmed>5000){restoreArmed=Date.now();if(btn){btn.classList.add("armed");btn.textContent="Zeker? Tik nogmaals"}return}
+    restoreArmed=0; const lb=state.lastBackup; state=st; if(!state.active||!state.vehicles.some(v=>v.id===state.active))state.active=state.vehicles[0].id;
+    state.lastBackup=st.lastBackup||lb||new Date().toISOString(); prefill=null; impResult=null; save(); setTab("overzicht"); toast("Gegevens teruggezet");
+  }
+  else if(kind==="import"){impText=String(d.get("txt")||"");impResult=checkImport(parseImport(impText));render();document.getElementById("impcard")?.scrollIntoView({behavior:"smooth",block:"start"})}
+});
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1);if(h!==tab&&TABS.some(t=>t[0]===h)){tab=h;render()}});
+
+backupPill();
+render();
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+if("serviceWorker" in navigator&&location.protocol!=="file:"){const had=!!navigator.serviceWorker.controller;let done=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(had&&!done){done=true;location.reload()}});navigator.serviceWorker.register("sw.js").catch(()=>{})}
+</script>
+</body>
+</html>
